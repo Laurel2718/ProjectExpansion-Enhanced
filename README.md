@@ -30,12 +30,6 @@ git clone https://github.com/Laurel2718/ProjectExpansion-Enhanced.git
 cd ProjectExpansion-Enhanced
 ./gradlew build
 ```
-
-### However, I suggest using this command because I am a programming novice XD
-```bash
-./gradlew build -x data --no-daemon
-```
-
 ### Dependencies
 - Minecraft 1.21.1
 - NeoForge 21.1.148+
