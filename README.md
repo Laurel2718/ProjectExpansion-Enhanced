@@ -10,6 +10,12 @@ An enhanced version of [Project Expansion](https://github.com/DonovanDMC/Project
 - **Just Like the Old time**: Crafting, searching, JEI features implemented 
 - **功能照旧**: 实现物品合成、搜索、与JEI的功能
 
+### ⭐ Added Final Star Pedestal and EMC functionality / 添加了终极之星的基座和EMC功能
+- **Duplicate**：Final Star can duplicate various items via pedestal
+- **复制**：终极之星可通过基座复制各种物品
+- **Charge**: Provides EMC to player equipment and the transmutation_tablet
+- **充能**：为玩家装备和转化桌提供EMC
+
 ### 🔒 Security & Performance / 安全与性能
 - **Pinyin Search Support**: Search for items using Chinese characters, full pinyin, or pinyin initials
 - **拼音搜索支持**: 支持使用中文字符、全拼音或拼音首字母搜索物品
