@@ -28,10 +28,25 @@ public record PacketArcaneTabletAction(String action, boolean shiftHeld) impleme
     
     @Override
     public void handle(IPayloadContext context) {
+        // System.out.println("DEBUG: PacketArcaneTabletAction received: action='" + action + "', shiftHeld=" + shiftHeld);
         if (context.player() instanceof ServerPlayer serverPlayer) {
             if (serverPlayer.containerMenu instanceof ContainerArcaneTablet arcaneTabletContainer) {
                 // Input validation: check if action is in whitelist
-                if (action.startsWith("extract:")) {
+                if (action.startsWith("extract_itemhash:")) {
+                    // Extract by hash operation - validate format: itemId@hash:hashCode
+                    String hashData = action.substring(17);
+                    if (hashData.length() > 512 || !isValidHashFormat(hashData)) {
+                        // System.out.println("DEBUG: Rejecting invalid hash format: " + hashData);
+                        return; // Reject invalid hash format
+                    }
+                    // System.out.println("DEBUG: Hash format validation passed");
+                } else if (action.startsWith("extract_iteminfo:")) {
+                    // Extract by ItemInfo string operation
+                    String itemInfoStr = action.substring(17);
+                    if (itemInfoStr.length() > 1024) {
+                        return; // Reject overly long ItemInfo strings
+                    }
+                } else if (action.startsWith("extract:")) {
                     // Extract operation requires additional resource ID format validation
                     String itemId = action.substring(8);
                     if (itemId.length() > 256 || !isValidResourceLocation(itemId)) {
@@ -41,6 +56,7 @@ public record PacketArcaneTabletAction(String action, boolean shiftHeld) impleme
                     return; // Reject unknown operation
                 }
                 
+                // System.out.println("DEBUG: Calling arcaneTabletContainer.performAction with: '" + action + "'");
                 arcaneTabletContainer.performAction(action, shiftHeld);
             }
         }
@@ -49,6 +65,22 @@ public record PacketArcaneTabletAction(String action, boolean shiftHeld) impleme
     private boolean isValidResourceLocation(String resourceId) {
         try {
             ResourceLocation.parse(resourceId);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private boolean isValidHashFormat(String hashData) {
+        try {
+            String[] parts = hashData.split("@hash:");
+            if (parts.length != 2) {
+                return false;
+            }
+            // Validate resource location
+            ResourceLocation.parse(parts[0]);
+            // Validate hash code is a number
+            Integer.parseInt(parts[1]);
             return true;
         } catch (Exception e) {
             return false;

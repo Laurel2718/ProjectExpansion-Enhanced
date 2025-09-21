@@ -37,9 +37,16 @@ public class ExtractItemButton extends EXButton {
     @Override
     public void onPress() {
         if (!item.isEmpty()) {
-            // Use the item's registry name for extraction
-            String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item.getItem()).toString();
-            super.withTag("extract:" + itemId);
+            // Use ItemInfo to preserve NBT data for precise matching
+            moze_intel.projecte.api.ItemInfo itemInfo = moze_intel.projecte.api.ItemInfo.fromStack(item);
+            
+            // Create a more reliable identifier using hashCode and basic info
+            String itemId = itemInfo.getItem().getRegisteredName();
+            int hashCode = itemInfo.hashCode();
+            String itemData = itemId + "@hash:" + hashCode;
+            
+            // System.out.println("DEBUG: Sending ItemInfo: '" + itemInfo.toString() + "' as encoded: '" + itemData + "' for stack: " + item);
+            super.withTag("extract_itemhash:" + itemData);
             super.onPress();
         }
     }
@@ -83,6 +90,9 @@ public class ExtractItemButton extends EXButton {
     private String getExtractionCountStr() {
         if (provider == null) return "";
         
+        // Check if item has value using same logic as burn/extraction
+        if (!IEMCProxy.INSTANCE.hasValue(item)) return "???";
+        
         long emc = IEMCProxy.INSTANCE.getValue(item);
         if (emc == 0L) return "???"; // shouldn't happen, but...
 
@@ -103,9 +113,11 @@ public class ExtractItemButton extends EXButton {
     public void addTooltip(double mouseX, double mouseY, List<Component> curTip, boolean shift) {
         if (isHovered && !item.isEmpty()) {
             curTip.addAll(item.getTooltipLines(
-                net.minecraft.world.item.Item.TooltipContext.of(Minecraft.getInstance().level),
-                Minecraft.getInstance().player, 
-                Minecraft.getInstance().options.advancedItemTooltips ? TooltipFlag.Default.ADVANCED : TooltipFlag.Default.NORMAL
+                net.minecraft.world.item.Item.TooltipContext.of(net.minecraft.client.Minecraft.getInstance().level),
+                net.minecraft.client.Minecraft.getInstance().player, 
+                net.minecraft.client.Minecraft.getInstance().options.advancedItemTooltips ? 
+                    net.minecraft.world.item.TooltipFlag.Default.ADVANCED : 
+                    net.minecraft.world.item.TooltipFlag.Default.NORMAL
             ));
         }
     }

@@ -97,6 +97,7 @@ public class ContainerArcaneTablet extends ContainerBase {
     }
 
     public void performAction(String action, boolean shiftHeld) {
+        // System.out.println("DEBUG: performAction called with action: '" + action + "', shiftHeld: " + shiftHeld);
         switch (action) {
             case "clear" -> clearCraftingMatrix();
             case "rotate" -> rotateCraftingMatrix(!shiftHeld);
@@ -115,7 +116,14 @@ public class ContainerArcaneTablet extends ContainerBase {
         }
         
         // Handle item extraction
-        if (action.startsWith("extract:")) {
+        if (action.startsWith("extract_itemhash:")) {
+            // System.out.println("DEBUG: Server received extract_itemhash action: " + action);
+            tryExtractItemByHash(action.substring(17), shiftHeld);
+        } else if (action.startsWith("extract_iteminfo:")) {
+            // System.out.println("DEBUG: Server received extract_iteminfo action: " + action);
+            tryExtractItemByItemInfo(action.substring(17), shiftHeld);
+        } else if (action.startsWith("extract:")) {
+            // System.out.println("DEBUG: Server received extract action: " + action);
             tryExtractItem(action.substring(8), shiftHeld);
         }
     }
@@ -161,32 +169,52 @@ public class ContainerArcaneTablet extends ContainerBase {
         try {
             ResourceLocation id = ResourceLocation.parse(itemId);
             Item item = BuiltInRegistries.ITEM.get(id);
+            
             if (item != null && item != Items.AIR && knowledgeProvider != null) {
-                BigInteger availableEMC = knowledgeProvider.getEmc();
-                long itemValue = IEMCProxy.INSTANCE.getValue(item);
-                BigInteger emc = BigInteger.valueOf(itemValue);
-                
-                // Prevent negative and zero values
-                if (emc.equals(BigInteger.ZERO) || itemValue <= 0) {
-                    return;
+                // Find the first matching item in player's knowledge instead of creating a new one
+                // This ensures we get the actual ItemStack with proper NBT data
+                ItemStack targetStack = null;
+                for (ItemInfo knowledgeItem : knowledgeProvider.getKnowledge()) {
+                    ItemStack knowledgeStack = knowledgeItem.createStack();
+                    if (!knowledgeStack.isEmpty() && knowledgeStack.getItem() == item) {
+                        targetStack = knowledgeStack;
+                        break;
+                    }
                 }
                 
-                // Safe division calculation to prevent overflow
-                BigInteger bigAvail;
-                try {
-                    bigAvail = availableEMC.divide(emc);
-                } catch (ArithmeticException e) {
-                    return; // Division by zero or other arithmetic exception
+                if (targetStack == null) {
+                    return; // Player doesn't have this item type in knowledge
                 }
-                
-                // Limit maximum available quantity to prevent integer overflow
-                int available = Math.min(
-                    bigAvail.compareTo(MAX_INT) >= 0 ? Integer.MAX_VALUE : bigAvail.intValue(),
-                    64 // Limit single extraction to max stack size
-                );
+            
+                // Use the found matching stack for all operations
+                ItemStack cleanedStack = IEMCProxy.INSTANCE.getPersistentInfo(ItemInfo.fromStack(targetStack)).createStack();
+            
+            BigInteger availableEMC = knowledgeProvider.getEmc();
+            long itemValue = IEMCProxy.INSTANCE.getValue(cleanedStack);
+            BigInteger emc = BigInteger.valueOf(itemValue);
+            
+            // Only reject if EMC is actually zero (consistent with burn logic)
+            // Some items with special handling might have getValue() issues but still be valid
+            if (emc.equals(BigInteger.ZERO)) {
+                return;
+            }
+            
+            // Safe division calculation to prevent overflow
+            BigInteger bigAvail;
+            try {
+                bigAvail = availableEMC.divide(emc);
+            } catch (ArithmeticException e) {
+                return; // Division by zero or other arithmetic exception
+            }
+            
+            // Limit maximum available quantity to prevent integer overflow
+            int available = Math.min(
+                bigAvail.compareTo(MAX_INT) >= 0 ? Integer.MAX_VALUE : bigAvail.intValue(),
+                64 // Limit single extraction to max stack size
+            );
             
             if (available > 0) {
-                ItemStack stack = new ItemStack(item);
+                ItemStack stack = cleanedStack.copy();
                 BigInteger cost = BigInteger.ZERO;
                 
                 if (pullStack) {
@@ -220,6 +248,263 @@ public class ContainerArcaneTablet extends ContainerBase {
             if (player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.connection.disconnect(net.minecraft.network.chat.Component.literal("Invalid item extraction request"));
             }
+        }
+    }
+    
+    private void tryExtractItemByItemInfo(String itemInfoStr, boolean pullStack) {
+        System.out.println("DEBUG: tryExtractItemByItemInfo called with: '" + itemInfoStr + "', pullStack: " + pullStack);
+        
+        // Rate limiting check - performance optimized
+        if (!checkExtractionRateLimit(player.getUUID())) {
+            return;
+        }
+        
+        try {
+            ItemStack targetStack = null;
+            ItemInfo requestedItemInfo = null;
+            
+            // Find exact ItemInfo match in player's knowledge
+            for (ItemInfo knowledgeItem : knowledgeProvider.getKnowledge()) {
+                String knowledgeStr = knowledgeItem.toString();
+                System.out.println("DEBUG: Comparing '" + itemInfoStr + "' with knowledge '" + knowledgeStr + "'");
+                if (knowledgeStr.equals(itemInfoStr)) {
+                    requestedItemInfo = knowledgeItem;
+                    targetStack = knowledgeItem.createStack();
+                    System.out.println("DEBUG: Found exact ItemInfo match!");
+                    break;
+                }
+            }
+            
+            if (targetStack == null) {
+                System.out.println("DEBUG: No exact ItemInfo match found, falling back to base item matching");
+                // Fall back to base item matching for backward compatibility
+                try {
+                    // Parse the item name from ItemInfo string (before any space/bracket)
+                    String baseItemName = itemInfoStr.split("[\\s\\{]")[0];
+                    ResourceLocation id = ResourceLocation.parse(baseItemName);
+                    Item item = BuiltInRegistries.ITEM.get(id);
+                    
+                    if (item != null && item != Items.AIR && knowledgeProvider != null) {
+                        for (ItemInfo knowledgeItem : knowledgeProvider.getKnowledge()) {
+                            ItemStack knowledgeStack = knowledgeItem.createStack();
+                            if (!knowledgeStack.isEmpty() && knowledgeStack.getItem() == item) {
+                                targetStack = knowledgeStack;
+                                System.out.println("DEBUG: Found fallback match: " + knowledgeItem.toString());
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("DEBUG: Fallback parsing failed: " + e.getMessage());
+                }
+            }
+            
+            if (targetStack == null) {
+                System.out.println("DEBUG: No matching item found at all");
+                return; // Player doesn't have this item in knowledge
+            }
+            
+            // Use the found matching stack for all operations
+            ItemStack cleanedStack = IEMCProxy.INSTANCE.getPersistentInfo(ItemInfo.fromStack(targetStack)).createStack();
+            
+            BigInteger availableEMC = knowledgeProvider.getEmc();
+            long itemValue = IEMCProxy.INSTANCE.getValue(cleanedStack);
+            BigInteger emc = BigInteger.valueOf(itemValue);
+            
+            // Only reject if EMC is actually zero (consistent with burn logic)
+            if (emc.equals(BigInteger.ZERO)) {
+                return;
+            }
+            
+            // Safe division calculation to prevent overflow
+            BigInteger bigAvail;
+            try {
+                bigAvail = availableEMC.divide(emc);
+            } catch (ArithmeticException e) {
+                return; // Division by zero or other arithmetic exception
+            }
+            
+            // Limit maximum available quantity to prevent integer overflow
+            int available = Math.min(
+                bigAvail.compareTo(MAX_INT) >= 0 ? Integer.MAX_VALUE : bigAvail.intValue(),
+                64 // Limit single extraction to max stack size
+            );
+            
+            if (available > 0) {
+                ItemStack stack = cleanedStack.copy();
+                BigInteger cost = BigInteger.ZERO;
+                
+                if (pullStack) {
+                    // Give full stack to player
+                    int stackSize = Math.min(stack.getMaxStackSize(), available);
+                    stack.setCount(stackSize);
+                    player.getInventory().placeItemBackInInventory(stack, true);
+                    cost = emc.multiply(BigInteger.valueOf(stackSize));
+                } else {
+                    // Add single item to cursor
+                    if (getCarried().isEmpty()) {
+                        setCarried(stack);
+                        cost = emc;
+                    } else if (getCarried().getCount() < getCarried().getMaxStackSize() && 
+                               getCarried().getItem() == stack.getItem()) {
+                        getCarried().grow(1);
+                        cost = emc;
+                    }
+                }
+                
+                if (!cost.equals(BigInteger.ZERO)) {
+                    knowledgeProvider.setEmc(availableEMC.subtract(cost));
+                    if (player instanceof ServerPlayer serverPlayer) {
+                        knowledgeProvider.sync(serverPlayer);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Exception in tryExtractItemByItemInfo: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void tryExtractItemByHash(String hashData, boolean pullStack) {
+        System.out.println("DEBUG: tryExtractItemByHash called with: '" + hashData + "', pullStack: " + pullStack);
+        
+        // Rate limiting check - performance optimized
+        if (!checkExtractionRateLimit(player.getUUID())) {
+            return;
+        }
+        
+        try {
+            // Parse format: "itemId@hash:hashCode"
+            String[] parts = hashData.split("@hash:");
+            if (parts.length != 2) {
+                System.out.println("DEBUG: Invalid hash format: " + hashData);
+                return;
+            }
+            
+            String itemId = parts[0];
+            int targetHashCode;
+            try {
+                targetHashCode = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
+                System.out.println("DEBUG: Invalid hash code: " + parts[1]);
+                return;
+            }
+            
+            System.out.println("DEBUG: Looking for item: '" + itemId + "' with hashCode: " + targetHashCode);
+            
+            ItemStack targetStack = null;
+            
+            // Find ItemInfo with matching item and hashCode
+            for (ItemInfo knowledgeItem : knowledgeProvider.getKnowledge()) {
+                if (knowledgeItem.getItem().getRegisteredName().equals(itemId)) {
+                    int knowledgeHashCode = knowledgeItem.hashCode();
+                    System.out.println("DEBUG: Checking knowledge item: " + knowledgeItem.toString() + " with hashCode: " + knowledgeHashCode);
+                    
+                    if (knowledgeHashCode == targetHashCode) {
+                        targetStack = knowledgeItem.createStack();
+                        System.out.println("DEBUG: Found exact hashCode match!");
+                        break;
+                    }
+                }
+            }
+            
+            // If exact match failed, fall back to base item matching
+            if (targetStack == null) {
+                System.out.println("DEBUG: No exact hashCode match found, falling back to base item matching");
+                try {
+                    ResourceLocation id = ResourceLocation.parse(itemId);
+                    Item item = BuiltInRegistries.ITEM.get(id);
+                    
+                    if (item != null && item != Items.AIR && knowledgeProvider != null) {
+                        for (ItemInfo knowledgeItem : knowledgeProvider.getKnowledge()) {
+                            ItemStack knowledgeStack = knowledgeItem.createStack();
+                            if (!knowledgeStack.isEmpty() && knowledgeStack.getItem() == item) {
+                                targetStack = knowledgeStack;
+                                System.out.println("DEBUG: Found fallback match: " + knowledgeItem.toString());
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("DEBUG: Fallback parsing failed: " + e.getMessage());
+                }
+            }
+            
+            if (targetStack == null) {
+                System.out.println("DEBUG: No matching item found at all");
+                return; // Player doesn't have this item in knowledge
+            }
+            
+            // Use the found matching stack for all operations
+            ItemStack cleanedStack = IEMCProxy.INSTANCE.getPersistentInfo(ItemInfo.fromStack(targetStack)).createStack();
+            
+            BigInteger availableEMC = knowledgeProvider.getEmc();
+            long itemValue = IEMCProxy.INSTANCE.getValue(cleanedStack);
+            BigInteger emc = BigInteger.valueOf(itemValue);
+            
+            // Only reject if EMC is actually zero (consistent with burn logic)
+            if (emc.equals(BigInteger.ZERO)) {
+                System.out.println("DEBUG: Item has zero EMC value");
+                return;
+            }
+            
+            // Safe division calculation to prevent overflow
+            BigInteger bigAvail;
+            try {
+                bigAvail = availableEMC.divide(emc);
+            } catch (ArithmeticException e) {
+                System.out.println("DEBUG: Division error: " + e.getMessage());
+                return; // Division by zero or other arithmetic exception
+            }
+            
+            // Limit maximum available quantity to prevent integer overflow
+            int available = Math.min(
+                bigAvail.compareTo(MAX_INT) >= 0 ? Integer.MAX_VALUE : bigAvail.intValue(),
+                64 // Limit single extraction to max stack size
+            );
+            
+            System.out.println("DEBUG: Available quantity: " + available + ", EMC cost: " + emc + ", Available EMC: " + availableEMC);
+            
+            if (available > 0) {
+                ItemStack stack = cleanedStack.copy();
+                BigInteger cost = BigInteger.ZERO;
+                
+                if (pullStack) {
+                    // Give full stack to player
+                    int stackSize = Math.min(stack.getMaxStackSize(), available);
+                    stack.setCount(stackSize);
+                    player.getInventory().placeItemBackInInventory(stack, true);
+                    cost = emc.multiply(BigInteger.valueOf(stackSize));
+                    System.out.println("DEBUG: Gave stack of " + stackSize + " to player inventory");
+                } else {
+                    // Add single item to cursor
+                    if (getCarried().isEmpty()) {
+                        setCarried(stack);
+                        cost = emc;
+                        System.out.println("DEBUG: Set carried item to: " + stack);
+                    } else if (getCarried().getCount() < getCarried().getMaxStackSize() && 
+                               getCarried().getItem() == stack.getItem()) {
+                        getCarried().grow(1);
+                        cost = emc;
+                        System.out.println("DEBUG: Grew carried item by 1");
+                    } else {
+                        System.out.println("DEBUG: Cannot add to carried item - incompatible or full");
+                    }
+                }
+                
+                if (!cost.equals(BigInteger.ZERO)) {
+                    knowledgeProvider.setEmc(availableEMC.subtract(cost));
+                    if (player instanceof ServerPlayer serverPlayer) {
+                        knowledgeProvider.sync(serverPlayer);
+                    }
+                    System.out.println("DEBUG: Deducted " + cost + " EMC, remaining: " + knowledgeProvider.getEmc());
+                }
+            } else {
+                System.out.println("DEBUG: No items available (insufficient EMC or other constraint)");
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Exception in tryExtractItemByHash: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
