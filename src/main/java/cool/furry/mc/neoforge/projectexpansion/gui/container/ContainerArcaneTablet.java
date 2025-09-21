@@ -876,6 +876,9 @@ public class ContainerArcaneTablet extends ContainerBase {
      * This method handles both transferring from player inventory and from EMC
      */
     public void transferItems(Int2ObjectMap<List<ItemStack>> stacksMap) {
+        // Auto-clear crafting matrix before transferring to avoid material conflicts
+        clearCraftingMatrix();
+        
         // First try to transfer from player inventory
         stacksMap.forEach(this::transferFromInventory);
         

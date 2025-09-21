@@ -3,13 +3,20 @@ package cool.furry.mc.neoforge.projectexpansion.gui;
 import cool.furry.mc.neoforge.projectexpansion.Main;
 import cool.furry.mc.neoforge.projectexpansion.gui.buttons.*;
 import cool.furry.mc.neoforge.projectexpansion.gui.container.ContainerArcaneTablet;
+import cool.furry.mc.neoforge.projectexpansion.integrations.jei.JEIPlugin;
 import cool.furry.mc.neoforge.projectexpansion.net.PacketHandler;
 import cool.furry.mc.neoforge.projectexpansion.net.packets.to_server.PacketArcaneTabletAction;
+import com.mojang.blaze3d.platform.InputConstants;
+import mezz.jei.api.constants.VanillaTypes;
+import mezz.jei.api.recipe.RecipeIngredientRole;
+import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Arcane Tablet GUI - Advanced transmutation table with crafting functionality
@@ -122,6 +129,21 @@ public class GUIArcaneTablet extends AbstractTableScreen<ContainerArcaneTablet> 
     }
     
     /**
+     * Client-side check if an item can be batch crafted
+     * This is a simplified version of the server-side logic
+     */
+    private boolean canBatchCraftOnClient(ItemStack stack) {
+        if (stack.isEmpty() || menu == null) {
+            return false;
+        }
+        
+        // Simple heuristic: if the stack size is less than max stack size, 
+        // it's likely a craftable item that can be batched
+        // For items like potions that typically don't stack, don't batch craft
+        return stack.getMaxStackSize() > 1 && stack.getCount() < stack.getMaxStackSize();
+    }
+    
+    /**
      * Refresh the item list after knowledge changes
      */
     public void refreshItemList() {
@@ -133,5 +155,78 @@ public class GUIArcaneTablet extends AbstractTableScreen<ContainerArcaneTablet> 
     
     private moze_intel.projecte.api.capabilities.IKnowledgeProvider getKnowledgeProvider() {
         return cool.furry.mc.neoforge.projectexpansion.util.Util.getKnowledgeProvider(net.minecraft.client.Minecraft.getInstance().player);
+    }
+    
+    /**
+     * Get the list of extract buttons for JEI integration
+     * This allows JEI to detect items in the extract buttons for R/U key bindings
+     */
+    public java.util.List<ExtractItemButton> getExtractButtons() {
+        return extractButtons;
+    }
+    
+    /**
+     * Handle key presses for JEI integration (R/U keys)
+     */
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // First check if JEI runtime is available
+        IJeiRuntime jeiRuntime = JEIPlugin.getJeiRuntime();
+        if (jeiRuntime == null) {
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+        
+        // Get mouse position relative to screen
+        double mouseX = this.minecraft.mouseHandler.xpos() * (double)this.minecraft.getWindow().getGuiScaledWidth() / (double)this.minecraft.getWindow().getScreenWidth();
+        double mouseY = this.minecraft.mouseHandler.ypos() * (double)this.minecraft.getWindow().getGuiScaledHeight() / (double)this.minecraft.getWindow().getScreenHeight();
+        
+        // Convert keyCode to InputConstants.Key
+        InputConstants.Key key = InputConstants.Type.KEYSYM.getOrCreate(keyCode);
+        
+        // Check if a key matches JEI's show recipe (R) or show uses (U) key
+        if (jeiRuntime.getKeyMappings().getShowRecipe().isActiveAndMatches(key)) {
+            ItemStack itemUnderMouse = getItemUnderMouse(mouseX, mouseY);
+            if (!itemUnderMouse.isEmpty()) {
+                // Create focus for showing recipes (looking for recipes that produce this item)
+                var focus = jeiRuntime.getJeiHelpers().getFocusFactory().createFocus(RecipeIngredientRole.OUTPUT, VanillaTypes.ITEM_STACK, itemUnderMouse);
+                jeiRuntime.getRecipesGui().show(focus);
+                return true;
+            }
+        } else if (jeiRuntime.getKeyMappings().getShowUses().isActiveAndMatches(key)) {
+            ItemStack itemUnderMouse = getItemUnderMouse(mouseX, mouseY);
+            if (!itemUnderMouse.isEmpty()) {
+                // Create focus for showing uses (looking for recipes that use this item)
+                var focus = jeiRuntime.getJeiHelpers().getFocusFactory().createFocus(RecipeIngredientRole.INPUT, VanillaTypes.ITEM_STACK, itemUnderMouse);
+                jeiRuntime.getRecipesGui().show(focus);
+                return true;
+            }
+        }
+        
+        // If we didn't handle the key, pass it to the parent
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+    
+    /**
+     * Get the item under the mouse cursor
+     * This checks both regular slots and extract buttons
+     */
+    private ItemStack getItemUnderMouse(double mouseX, double mouseY) {
+        // Check regular slots first
+        Slot hoveredSlot = getSlotUnderMouse();
+        if (hoveredSlot != null && hoveredSlot.hasItem()) {
+            return hoveredSlot.getItem();
+        }
+        
+        // Check extract buttons
+        for (ExtractItemButton extractButton : extractButtons) {
+            if (extractButton.isMouseOver(mouseX, mouseY)) {
+                ItemStack buttonItem = extractButton.getCurrentItem();
+                if (!buttonItem.isEmpty()) {
+                    return buttonItem;
+                }
+            }
+        }
+        
+        return ItemStack.EMPTY;
     }
 }

@@ -40,12 +40,11 @@ public class ExtractItemButton extends EXButton {
             // Use ItemInfo to preserve NBT data for precise matching
             moze_intel.projecte.api.ItemInfo itemInfo = moze_intel.projecte.api.ItemInfo.fromStack(item);
             
-            // Create a more reliable identifier using hashCode and basic info
+            // Create a reliable identifier using hashCode and basic info
             String itemId = itemInfo.getItem().getRegisteredName();
             int hashCode = itemInfo.hashCode();
             String itemData = itemId + "@hash:" + hashCode;
             
-            // System.out.println("DEBUG: Sending ItemInfo: '" + itemInfo.toString() + "' as encoded: '" + itemData + "' for stack: " + item);
             super.withTag("extract_itemhash:" + itemData);
             super.onPress();
         }
@@ -53,6 +52,14 @@ public class ExtractItemButton extends EXButton {
 
     public void setItem(ItemStack item) {
         this.item = item;
+    }
+    
+    /**
+     * Get the current item for JEI integration
+     * This allows JEI to detect the item in this button for R/U key bindings
+     */
+    public ItemStack getCurrentItem() {
+        return this.item != null ? this.item : ItemStack.EMPTY;
     }
 
     @Override
@@ -113,11 +120,9 @@ public class ExtractItemButton extends EXButton {
     public void addTooltip(double mouseX, double mouseY, List<Component> curTip, boolean shift) {
         if (isHovered && !item.isEmpty()) {
             curTip.addAll(item.getTooltipLines(
-                net.minecraft.world.item.Item.TooltipContext.of(net.minecraft.client.Minecraft.getInstance().level),
-                net.minecraft.client.Minecraft.getInstance().player, 
-                net.minecraft.client.Minecraft.getInstance().options.advancedItemTooltips ? 
-                    net.minecraft.world.item.TooltipFlag.Default.ADVANCED : 
-                    net.minecraft.world.item.TooltipFlag.Default.NORMAL
+                net.minecraft.world.item.Item.TooltipContext.of(Minecraft.getInstance().level),
+                Minecraft.getInstance().player, 
+                Minecraft.getInstance().options.advancedItemTooltips ? TooltipFlag.Default.ADVANCED : TooltipFlag.Default.NORMAL
             ));
         }
     }
