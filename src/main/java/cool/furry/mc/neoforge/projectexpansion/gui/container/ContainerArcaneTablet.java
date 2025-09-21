@@ -294,6 +294,15 @@ public class ContainerArcaneTablet extends ContainerBase {
     private void burnItem(boolean burnAll) {
         ItemStack cursorStack = getCarried();
         if (!cursorStack.isEmpty() && knowledgeProvider != null) {
+            // PROTECTION: Prevent burning the Arcane Tablet that is currently being used
+            if (cursorStack.getItem() instanceof ItemArcaneTablet) {
+                ItemStack heldTablet = player.getItemInHand(hand);
+                if (cursorStack == heldTablet) {
+                    // This is the exact same ItemStack instance that opened this GUI - don't burn it
+                    return;
+                }
+            }
+            
             if (IEMCProxy.INSTANCE.hasValue(cursorStack)) {
                 ItemStack fixed = IEMCProxy.INSTANCE.getPersistentInfo(ItemInfo.fromStack(cursorStack)).createStack();
                 
@@ -329,6 +338,15 @@ public class ContainerArcaneTablet extends ContainerBase {
         if (slotIndex >= 0 && slotIndex < slots.size()) {
             Slot slot = slots.get(slotIndex);
             ItemStack stack = slot.getItem();
+            
+            // PROTECTION: Prevent burning the Arcane Tablet that is currently being used
+            if (stack.getItem() instanceof ItemArcaneTablet) {
+                ItemStack heldTablet = player.getItemInHand(hand);
+                if (stack == heldTablet) {
+                    // This is the exact same ItemStack instance that opened this GUI - don't burn it
+                    return;
+                }
+            }
             
             if (!stack.isEmpty() && IEMCProxy.INSTANCE.hasValue(stack)) {
                 ItemStack fixed = IEMCProxy.INSTANCE.getPersistentInfo(ItemInfo.fromStack(stack)).createStack();
@@ -502,11 +520,34 @@ public class ContainerArcaneTablet extends ContainerBase {
             Slot slot = slots.get(slotId);
             ItemStack stack = slot.getItem();
             
+            // PROTECTION: Prevent moving/burning the Arcane Tablet that is currently being used
+            if (stack.getItem() instanceof ItemArcaneTablet) {
+                ItemStack heldTablet = player.getItemInHand(hand);
+                if (stack == heldTablet) {
+                    // This is the exact same ItemStack instance that opened this GUI - don't allow moving/burning
+                    return;
+                }
+            }
+            
             // Check if this is a player inventory slot (not crafting or result slots)
             if (slotId >= playerInventoryStart && !stack.isEmpty() && IEMCProxy.INSTANCE.hasValue(stack)) {
                 // Shift+Left click on inventory item with EMC value - burn the entire stack
                 burnItemFromInventory(slotId);
                 return; // Don't call super, we handled this click
+            }
+        }
+        
+        // PROTECTION: Also protect against regular clicks/drags on the Arcane Tablet
+        if (slotId >= 0 && slotId < slots.size()) {
+            Slot slot = slots.get(slotId);
+            ItemStack stack = slot.getItem();
+            
+            if (stack.getItem() instanceof ItemArcaneTablet) {
+                ItemStack heldTablet = player.getItemInHand(hand);
+                if (stack == heldTablet) {
+                    // This is the exact same ItemStack instance that opened this GUI - don't allow any clicks
+                    return;
+                }
             }
         }
         
@@ -765,6 +806,16 @@ public class ContainerArcaneTablet extends ContainerBase {
         // Handle player inventory shift-clicking (burning items with EMC)
         if (index >= playerInventoryStart && slot.hasItem()) {
             ItemStack stack = slot.getItem();
+            
+            // PROTECTION: Prevent moving/burning the Arcane Tablet that is currently being used
+            if (stack.getItem() instanceof ItemArcaneTablet) {
+                ItemStack heldTablet = player.getItemInHand(hand);
+                if (stack == heldTablet) {
+                    // This is the exact same ItemStack instance that opened this GUI - don't allow moving/burning
+                    return ItemStack.EMPTY;
+                }
+            }
+            
             if (player instanceof ServerPlayer serverPlayer && IEMCProxy.INSTANCE.hasValue(stack)) {
                 ItemStack fixed = IEMCProxy.INSTANCE.getPersistentInfo(ItemInfo.fromStack(stack)).createStack();
                 

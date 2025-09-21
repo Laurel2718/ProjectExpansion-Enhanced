@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "TWT",
+    "MSM",
+    "TCT"
+  ],
+  "key": {
+    "T": {
+      "item": "projectexpansion:magenta_emc_link"
+    },
+    "W": {
+      "item": "minecraft:crafting_table"
+    },
+    "M": {
+      "item": "projecte:transmutation_tablet"
+    },
+    "S": {
+      "item": "projectexpansion:magnum_star_omega"
+    },
+    "C": {
+      "tag": "projectexpansion:advanced_alchemical_chest"
+    }
+  },
+  "result": {
+    "id": "projectexpansion:arcane_tablet"  
+  }
+}
