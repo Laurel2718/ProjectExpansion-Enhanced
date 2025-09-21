@@ -292,7 +292,6 @@ public enum Lang implements ILangEntry {
         // Arcane Tablet
         ARCANE_TABLET("arcane_tablet"),
         ARCANE_TABLET_TOOLTIP("arcane_tablet", "tooltip"),
-        ARCANE_TABLET_TOOLTIP_2("arcane_tablet", "tooltip2"),
 
         // Misc
         COMRESSED_COLLECTOR_TOOLTIP("compressed_collector", "tooltip"),

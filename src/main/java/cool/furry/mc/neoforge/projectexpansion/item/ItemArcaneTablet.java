@@ -49,7 +49,6 @@ public class ItemArcaneTablet extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         super.appendHoverText(stack, context, tooltip, flag);
         tooltip.add(Lang.Items.ARCANE_TABLET_TOOLTIP.translateColored(ChatFormatting.GRAY));
-        tooltip.add(Lang.Items.ARCANE_TABLET_TOOLTIP_2.translateColored(ChatFormatting.DARK_GRAY));
     }
     
     /**
