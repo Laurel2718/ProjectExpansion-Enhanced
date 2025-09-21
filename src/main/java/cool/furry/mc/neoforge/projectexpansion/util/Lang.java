@@ -319,6 +319,8 @@ public enum Lang implements ILangEntry {
         // Misc
         FINAL_STAR_SHARD_TOOLTIP("final_star_shard", "tooltip"),
         FINAL_STAR_TOOLTIP("final_star", "tooltip"),
+        FINAL_STAR_PEDESTAL_TOOLTIP("final_star", "pedestal_tooltip"),
+        FINAL_STAR_PEDESTAL_DESCRIPTION("final_star", "pedestal"),
         INFINITE_FUEL_TOOLTIP("infinite_fuel", "tooltip"),
         INFINITE_FUEL_NOT_ENOUGH_EMC("infinite_fuel", "not_enough_emc"),
         INFINITE_STEAK_TOOLTIP("infinite_steak", "tooltip"),

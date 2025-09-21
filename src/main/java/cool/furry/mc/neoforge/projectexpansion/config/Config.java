@@ -45,6 +45,12 @@ public final class Config {
         public final ModConfigSpec.ConfigValue<Boolean> enableCollectorOptimizations = Builder.comment("If optimizations (ticking only once per second) should be enabled for collectors. This will make them process at most one item each second.").define("enableCollectorOptimizations", false);
         public final ModConfigSpec.ConfigValue<Integer> compactSunBonus = Builder.comment("The bonus (multiplicative) the compact sun block should give. Set to 0 to disable.").define("compactSunBonus", 10);
         public final ModConfigSpec.ConfigValue<Boolean> sunMultiplierPriceCompensation = Builder.comment("Enable determining the sun bonus multiplier via the difference in emc price between the final power flower and the compact sun block, rounded up to the next 10. In normal gameplay this is ~33x, so a 40x multiplier. If either block has no emc value or the multiplier is lower than compactSunBonus, that value will be used instead.").define("sunMultiplierPriceCompensation", true);
+        
+        // Final Star Configuration Options
+        public final ModConfigSpec.ConfigValue<Integer> finalStarUpdateInterval = Builder.comment("Update interval in ticks for the Final Star when in a Pedestal. Setting this to 0 prevents any item copying (making the Final Star useless...)").defineInRange("finalStarUpdateInterval", 20, 0, Integer.MAX_VALUE);
+        public final ModConfigSpec.ConfigValue<Boolean> finalStarCopiesAnyItem = Builder.comment("If false, the Final Star can only copy items that have an EMC value.").define("finalStarCopiesAnyItem", true);
+        public final ModConfigSpec.ConfigValue<Boolean> finalStarCopiesNBT = Builder.comment("If false, items copied by the Final Star will have no NBT, unless they are in the 'projecte:nbt_whitelist' item tag.").define("finalStarCopiesNBT", false);
+        
         private Server() { Spec = Builder.build(); }
     }
 

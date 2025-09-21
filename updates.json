@@ -2,10 +2,11 @@
     "homepage": "https://www.curseforge.com/minecraft/mc-mods/project-expansion",
     "1.21.1": {
         "1.21.1-10.0.0": "https://github.com/YourUsername/ProjectExpansion-Enhanced/releases/tag/10.0.0",
-        "1.21.1-10.0.1": "https://github.com/YourUsername/ProjectExpansion-Enhanced/releases/tag/1.21.1-10.0.1"
+        "1.21.1-10.0.1": "https://github.com/YourUsername/ProjectExpansion-Enhanced/releases/tag/1.21.1-10.0.1",
+        "1.21.1-10.0.2": "https://github.com/YourUsername/ProjectExpansion-Enhanced/releases/tag/1.21.1-10.0.2"
     },
     "promos": {
-        "1.21.1-latest": "1.21.1-10.0.1",
-        "1.21.1-recommended": "1.21.1-10.0.1"
+        "1.21.1-latest": "1.21.1-10.0.2",
+        "1.21.1-recommended": "1.21.1-10.0.2"
     }
 }
